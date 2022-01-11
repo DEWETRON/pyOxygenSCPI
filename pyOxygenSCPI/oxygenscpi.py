@@ -7,8 +7,9 @@ Created on Sun Jul 30 17:53:14 2017
 
 import socket
 import logging
-from time import sleep
 import datetime as dt
+from enum import Enum
+from time import sleep
 
 log = logging.getLogger('oxygenscpi')
 
@@ -219,6 +220,49 @@ class OxygenSCPI:
         if number is None:
             number = len(self.channelList)
         return self._sendRaw(':NUM:NORMAL:NUMBER {:d}'.format(number))
+
+    class NumberFormat(Enum):
+        ASCII = 0
+        BINARY_INTEL = 1
+        BINARY_MOTOROLA = 2
+
+    def setNumberFormat(self, format=NumberFormat.ASCII):
+        """
+        Set the number format of the output
+        Available since 1.20
+        """
+        if not is_minimum_version(self._scpi_version, (1,20)):
+            raise NotImplementedError(":NUM:NORMAL:FORMAT requires protocol version 1.20");
+
+        if format == self.NumberFormat.BINARY_INTEL:
+            fmt = "BIN_INTEL"
+        elif format == self.NumberFormat.BINARY_MOTOROLA:
+            fmt = "BIN_MOTOROLA"
+        else:
+            fmt = "ASCII"
+
+        return self._sendRaw(':NUM:NORMAL:FORMAT {:s}'.format(fmt))
+
+    def getNumberFormat(self) -> NumberFormat:
+        """
+        Read the number format of the output
+        Available since 1.20
+        """
+        if not is_minimum_version(self._scpi_version, (1,20)):
+            raise NotImplementedError(":NUM:NORMAL:FORMAT? requires protocol version 1.20");
+
+        ret = self._askRaw(':NUM:NORM:FORMAT?')
+        if isinstance(ret, bytes):
+            format = ret.decode()
+            if ' ' in format:
+                format = format.split(' ')[1].rstrip()
+            if format == "ASCII":
+                return self.NumberFormat.ASCII
+            elif format == "BIN_INTEL":
+                return self.NumberFormat.BINARY_INTEL
+            elif format == "BIN_MOTOROLA":
+                return self.NumberFormat.BINARY_MOTOROLA
+        raise Exception("Invalid NumberFormat")
 
     def getValueDimensions(self):
         """ Read the Dimension of the output

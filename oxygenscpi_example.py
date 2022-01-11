@@ -13,6 +13,7 @@ DEWETRON_IP_ADDR = 'localhost'
 mDevice = OxygenSCPI(ip_addr=DEWETRON_IP_ADDR)
 
 print(f"Device Name: {mDevice.getIdn()}")
+print(f"Protocol version: {mDevice.getVersion()}")
 
 # Set Tranfer Channels to be transfered on values query. Please make sure, that
 # Channels are available in Oxygen
