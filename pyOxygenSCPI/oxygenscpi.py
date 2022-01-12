@@ -9,6 +9,7 @@ import socket
 import logging
 import datetime as dt
 from enum import Enum
+from struct import unpack
 from time import sleep
 
 log = logging.getLogger('oxygenscpi')
@@ -40,6 +41,7 @@ class OxygenSCPI:
         self.channelList = []
         self._scpi_version = (1,5)
         self._value_dimension = None
+        self._value_format = self.NumberFormat.ASCII
         self.elogChannelList = []
         self.DataStream = OxygenScpiDataStream(self)
 
@@ -241,7 +243,8 @@ class OxygenSCPI:
         else:
             fmt = "ASCII"
 
-        return self._sendRaw(':NUM:NORMAL:FORMAT {:s}'.format(fmt))
+        self._sendRaw(':NUM:NORMAL:FORMAT {:s}'.format(fmt))
+        self._value_format = format # Cache value
 
     def getNumberFormat(self) -> NumberFormat:
         """
@@ -290,6 +293,17 @@ class OxygenSCPI:
             return False
         return self.getValueDimensions()
 
+    def _get_value_from_binary(self, data):
+        """ Convert binary float32 values to float values array
+        """
+        numlenchars = int(chr(data[1]))
+        array_length = int(data[2:(2+numlenchars)])
+        data = data[(2 + numlenchars):(2 + numlenchars + array_length)]
+
+        is_intel = self._value_format != self.NumberFormat.BINARY_MOTOROLA
+        byteorder = "<" if is_intel else ">"
+        return unpack(byteorder + "f" * (int(len(data)/4)), data)
+
     def getValues(self):
         """Queries the actual values from the numeric system
 
@@ -305,55 +319,64 @@ class OxygenSCPI:
             data = self._askRaw(':NUM:NORM:VAL?')
         except OSError:
             return False
-        if type(data) is bytes:
-            data = data.decode()
-        else:
+
+        if not type(data) is bytes:
             # No Data Available or Wrong Channel
             return False
+
         # Remove Header if Whitespace present
-        if ' ' in data:
-            data = data.split(' ')[1]
-        data = data.split(',')
-        values = []
-        if self._value_dimension is not None:
-            idx = 0
-            for dim in self._value_dimension:
-                if dim < 2:
-                    try:
-                        values.append(float(data[idx]))
+        if data.startswith(b':NUM:VAL '):
+            data = data[9:]
+        
+        # Remove trailing newline
+        if len(data) > 1 and data[-1] == ord('\n'):
+            data = data[0:-1]
+
+        # Check if we have binary data (e.g. #18abcdefgh)
+        if len(data) > 2 and data[0] == ord('#'):
+            values = self._get_value_from_binary(data)
+        else:
+            data = data.decode().split(',')
+            values = []
+            if self._value_dimension is not None:
+                idx = 0
+                for dim in self._value_dimension:
+                    if dim < 2:
+                        try:
+                            values.append(float(data[idx]))
+                            idx += 1
+                            continue
+                        except ValueError:
+                            pass
+                        except IndexError:
+                            return False
+                        try:
+                            # Try to Parse DateTime "2017-10-10T12:16:52.33136+02:00"
+                            # Variable lenght of Sub-Seconds
+                            iso_ts = ''.join(data[idx].replace('"','').rsplit(':', 1))
+                            timestamp = dt.datetime.strptime(iso_ts, '%Y-%m-%dT%H:%M:%S.%f%z')
+                            values.append(timestamp)
+                        except ValueError:
+                            values.append(data[idx])
                         idx += 1
+                    else:
+                        values.append([float(val) for val in data[idx:idx+dim]])
+                        idx += dim
+            else:
+                for val in data:
+                    try:
+                        values.append(float(val))
                         continue
                     except ValueError:
                         pass
-                    except IndexError:
-                        return False
                     try:
                         # Try to Parse DateTime "2017-10-10T12:16:52.33136+02:00"
                         # Variable lenght of Sub-Seconds
-                        iso_ts = ''.join(data[idx].replace('"','').rsplit(':', 1))
+                        iso_ts = ''.join(val.replace('"','').rsplit(':', 1))
                         timestamp = dt.datetime.strptime(iso_ts, '%Y-%m-%dT%H:%M:%S.%f%z')
                         values.append(timestamp)
                     except ValueError:
-                        values.append(data[idx])
-                    idx += 1
-                else:
-                    values.append([float(val) for val in data[idx:idx+dim]])
-                    idx += dim
-        else:
-            for val in data:
-                try:
-                    values.append(float(val))
-                    continue
-                except ValueError:
-                    pass
-                try:
-                    # Try to Parse DateTime "2017-10-10T12:16:52.33136+02:00"
-                    # Variable lenght of Sub-Seconds
-                    iso_ts = ''.join(val.replace('"','').rsplit(':', 1))
-                    timestamp = dt.datetime.strptime(iso_ts, '%Y-%m-%dT%H:%M:%S.%f%z')
-                    values.append(timestamp)
-                except ValueError:
-                    values.append(val)
+                        values.append(val)
 
         return values
 

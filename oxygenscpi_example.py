@@ -22,6 +22,12 @@ mDevice.setTransferChannels(['AI 1/1', 'AI 1/2', 'AI 1/3'])
 # Set Number of transfered Channels (default: 15)
 mDevice.setNumberChannels()
 
+# Choose a suitable number format (Default is ASCII)
+mDevice.setNumberFormat(OxygenSCPI.NumberFormat.ASCII)
+#mDevice.setNumberFormat(OxygenSCPI.NumberFormat.BINARY_INTEL)
+#mDevice.setNumberFormat(OxygenSCPI.NumberFormat.BINARY_MOTOROLA)
+
+
 # Capture Values
 print("Requesting values...")
 values = mDevice.getValues()
