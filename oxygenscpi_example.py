@@ -17,7 +17,7 @@ print(f"Protocol version: {mDevice.getVersion()}")
 
 # Set Tranfer Channels to be transfered on values query. Please make sure, that
 # Channels are available in Oxygen
-mDevice.setTransferChannels(['AI 1/1', 'AI 1/2', 'AI 1/3'])
+mDevice.setTransferChannels(['REL-TIME', 'AI 1/1', 'AI 1/2', 'AI 1/3'])
 #mDevice.setTransferChannels(['AI 1/I1 Sim', 'AI 1/I2 Sim', 'AI 1/I3 Sim'])
 # Set Number of transfered Channels (default: 15)
 mDevice.setNumberChannels()
@@ -33,7 +33,10 @@ print("Requesting values...")
 values = mDevice.getValues()
 print(f"{'Channel':<15} {'Value':<10}")
 for idx, channel in enumerate(mDevice.channelList):
-    print(f"{channel:<15} {values[idx]:>10.3f}")
+    if type(values[idx]) is float:
+        print(f"{channel:<15} {values[idx]:>10.2f}")
+    else:
+        print(f"{channel:<15} {values[idx]}")
 time.sleep(1)
 
 # Record Data File for 5 Seconds
