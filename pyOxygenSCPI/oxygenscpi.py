@@ -46,6 +46,7 @@ class OxygenSCPI:
         self._value_format = self.NumberFormat.ASCII
         self.elogChannelList = []
         self._getElogChannels()
+        self._localElogStartTime = dt.datetime.now()
         self.DataStream = OxygenScpiDataStream(self)
         self.ChannelProperties = OxygenChannelProperties(self)
 
@@ -553,6 +554,7 @@ class OxygenSCPI:
         return self._getElogChannels()
 
     def startElog(self):
+        self._localElogStartTime = dt.datetime.now()
         return self._sendRaw(':ELOG:START')
 
     def setElogPeriod(self, period):
