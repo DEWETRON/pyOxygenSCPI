@@ -11,6 +11,7 @@ import datetime as dt
 from enum import Enum
 from struct import unpack
 from time import sleep
+from contextlib import contextmanager
 
 log = logging.getLogger('oxygenscpi')
 
@@ -559,6 +560,27 @@ class OxygenSCPI:
 
     def stopElog(self):
         return self._sendRaw(':ELOG:STOP')
+    
+    @contextmanager
+    def elogContext(self):
+        """Safely starts and stops external logging.
+
+        This function should be used in a with statement to start external
+        logging and immediately stops it when either exiting the context
+        or when an Exception occurs within the context.
+
+        Example usage:
+            with mDevice.startElog():
+                # Here elog is started
+                time.sleep(10)
+                data = mDevice.fetchElog()
+            # Here elog is stopped
+        """
+        try:
+            self.startElog()
+            yield
+        finally:
+            self.stopElog()
 
     def setElogTimestamp(self, tsType='REL'):
         if tsType == 'REL':
