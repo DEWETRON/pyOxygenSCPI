@@ -39,10 +39,12 @@ class OxygenSCPI:
         #self.connect()
         self._headersActive = True
         self.channelList = []
+        self._getTransferChannels()
         self._scpi_version = (1,5)
         self._value_dimension = None
         self._value_format = self.NumberFormat.ASCII
         self.elogChannelList = []
+        self._getElogChannels()
         self.DataStream = OxygenScpiDataStream(self)
         self.ChannelProperties = OxygenChannelProperties(self)
 
@@ -172,25 +174,17 @@ class OxygenSCPI:
         """
         return self._sendRaw(':SETUP:LOAD "{:s}"'.format(setup_name))
 
-    def setTransferChannels(self, channelNames, includeRelTime=False, includeAbsTime=False):
-        """Sets the channels to be transfered within the numeric system
+    def _getTransferChannels(self):
+        """Reads the channels to be transferred within the numeric system.
 
-        This Function sets the channels to be transfered. This list must
-        contain Oxygen channel names.
-
-        Args:
-            channelNames (list of str): List of channel names
+        This function reads the actual list of channels to be transferred within
+        the numeric system and updates the attribute 'channelNames' with a list
+        of strings containing the actual channel names. It is called at
+        __init__ to get the previously set channels.
 
         Returns:
             True if Suceeded, False if not
         """
-        if includeRelTime:
-            channelNames.insert(0, "REL-TIME")
-        if includeAbsTime:
-            channelNames.insert(0, "ABS-TIME")
-        channelListStr = '"'+'","'.join(channelNames)+'"'
-        ret = self._sendRaw(':NUM:NORMAL:ITEMS {:s}'.format(channelListStr))
-        # Read back actual set channel names
         ret = self._askRaw(':NUM:NORMAL:ITEMS?')
         if isinstance(ret, bytes):
             ret = ret.decode().strip()
@@ -210,6 +204,27 @@ class OxygenSCPI:
                 return self.getValueDimensions()
             return True
         return False
+
+    def setTransferChannels(self, channelNames, includeRelTime=False, includeAbsTime=False):
+        """Sets the channels to be transfered within the numeric system
+
+        This Function sets the channels to be transfered. This list must
+        contain Oxygen channel names.
+
+        Args:
+            channelNames (list of str): List of channel names
+
+        Returns:
+            True if Suceeded, False if not
+        """
+        if includeRelTime:
+            channelNames.insert(0, "REL-TIME")
+        if includeAbsTime:
+            channelNames.insert(0, "ABS-TIME")
+        channelListStr = '"'+'","'.join(channelNames)+'"'
+        self._sendRaw(':NUM:NORMAL:ITEMS {:s}'.format(channelListStr))
+        # Read back actual set channel names
+        return self._getTransferChannels()
 
     def setNumberChannels(self, number=None):
         if number is None:
@@ -486,6 +501,34 @@ class OxygenSCPI:
             state = ret.decode().strip()
             return self.AcquisitionState(state)
 
+    def _getElogChannels(self):
+        """Reads the channels to be transfered within the ELOG system.
+        
+        This function reads the actual list of channels to be transferred within
+        the ELOG system and updates the attribute 'elogChannelList' with a list
+        of strings containing the actual elog channel names. It is called at
+        __init__ to get the previously set channels.
+
+        Returns:
+            True if Suceeded, False if not
+        """
+        ret = self._askRaw(':ELOG:ITEMS?')
+        if isinstance(ret, bytes):
+            ret = ret.decode().strip()
+            ret = ret.replace(':ELOG:ITEM ','')
+            channel_names = ret.split('","')
+            channel_names = [ch_name.replace('"','') for ch_name in channel_names]
+            if len(channel_names) == 1:
+                log.debug('One Channel Set: {:s}'.format(channel_names[0]))
+                if channel_names[0] == 'NONE':
+                    channel_names = []
+                    log.warning('No Channel Set')
+            self.elogChannelList = channel_names
+            if len(channel_names) == 0:
+                return False
+            return True
+        return False
+
     def setElogChannels(self, channel_names):
         """Sets the channels to be transfered within the ELOG system
 
@@ -503,25 +546,10 @@ class OxygenSCPI:
             return False
 
         channel_list_str = '"'+'","'.join(channel_names)+'"'
-        ret = self._sendRaw(':ELOG:ITEMS {:s}'.format(channel_list_str))
+        self._sendRaw(':ELOG:ITEMS {:s}'.format(channel_list_str))
         sleep(0.1)
         # Read back actual set channel names
-        ret = self._askRaw(':ELOG:ITEMS?')
-        if isinstance(ret, bytes):
-            ret = ret.decode().strip()
-            ret = ret.replace(':ELOG:ITEM ','')
-            channel_names = ret.split('","')
-            channel_names = [ch_name.replace('"','') for ch_name in channel_names]
-            if len(channel_names) == 1:
-                log.debug('One Channel Set: {:s}'.format(channel_names[0]))
-                if channel_names[0] == 'NONE':
-                    channel_names = []
-                    log.warning('No Channel Set')
-            self.elogChannelList = channel_names
-            if len(channel_names) == 0:
-                return False
-            return True
-        return False
+        return self._getElogChannels()
 
     def startElog(self):
         return self._sendRaw(':ELOG:START')
