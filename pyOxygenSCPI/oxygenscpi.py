@@ -599,7 +599,7 @@ class OxygenSCPI:
             data = data.decode()
         else:
             return False
-        if 'NONE' in data:
+        if any(d in data for d in ('NONE', 'ERROR')):
             return False
         # Remove Header if Whitespace present
         if ' ' in data:
