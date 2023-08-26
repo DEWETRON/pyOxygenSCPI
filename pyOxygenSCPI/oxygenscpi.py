@@ -560,7 +560,7 @@ class OxygenSCPI:
 
     def stopElog(self):
         return self._sendRaw(':ELOG:STOP')
-    
+
     @contextmanager
     def elogContext(self):
         """Safely starts and stops external logging.
@@ -587,6 +587,8 @@ class OxygenSCPI:
             return self._sendRaw(':ELOG:TIM REL')
         if tsType == 'ABS':
             return self._sendRaw(':ELOG:TIM ABS')
+        if tsType == 'ELOG':
+            return self._sendRaw(':ELOG:TIM ELOG')
         return self._sendRaw(':ELOG:TIM OFF')
 
     def fetchElog(self):
