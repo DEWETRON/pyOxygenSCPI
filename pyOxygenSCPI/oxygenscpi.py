@@ -61,6 +61,7 @@ class OxygenSCPI:
                 self.getVersion()
                 self._getTransferChannels(False)
                 self._getElogChannels(False)
+                self._getElogTimestamp()
                 return True
             except ConnectionRefusedError as msg:
                 template = "Connection to {!s}:{:d} refused: {!s}"
@@ -367,7 +368,7 @@ class OxygenSCPI:
         # Remove Header if Whitespace present
         if data.startswith(b':NUM:VAL '):
             data = data[9:]
-        
+
         # Remove trailing newline
         if len(data) > 1 and data[-1] == ord('\n'):
             data = data[0:-1]
@@ -377,7 +378,7 @@ class OxygenSCPI:
             data = self._get_value_from_binary(data)
         else:
             data = self._get_value_from_ascii(data)
-        
+
         if self._value_dimension is not None:
             idx = 0
             values = []
@@ -391,7 +392,7 @@ class OxygenSCPI:
                     values.append(data[idx:idx+dim])
                     idx += dim
             return values
-        
+
         return data
 
     def storeSetFileName(self, file_name):
@@ -514,7 +515,7 @@ class OxygenSCPI:
 
     def _getElogChannels(self, add_log=True):
         """Reads the channels to be transfered within the ELOG system.
-        
+
         This function reads the actual list of channels to be transferred within
         the ELOG system and updates the attribute 'elogChannelList' with a list
         of strings containing the actual elog channel names. It is called at
@@ -598,14 +599,27 @@ class OxygenSCPI:
         finally:
             self.stopElog()
 
+    def _getElogTimestamp(self):
+        """Get external logging configured timestamp.
+
+        Returns:
+            External logging timestamp string obtained from ':ELOG:TIM?'
+        """
+        ret = self._askRaw(':ELOG:TIM?')
+        if isinstance(ret, bytes):
+            ret = ret.decode().strip()
+            self._elogTimestamp = ret
+            return ret
+        return False
+
     def setElogTimestamp(self, tsType='REL'):
-        if tsType == 'REL':
-            return self._sendRaw(':ELOG:TIM REL')
-        if tsType == 'ABS':
-            return self._sendRaw(':ELOG:TIM ABS')
-        if tsType == 'ELOG':
-            return self._sendRaw(':ELOG:TIM ELOG')
-        return self._sendRaw(':ELOG:TIM OFF')
+        if tsType in ('REL', 'ABS', 'ELOG'):
+            self._sendRaw(f':ELOG:TIM {tsType}')
+            ts_read = self._getElogTimestamp()
+            return ts_read == tsType
+        send_ok = self._sendRaw(':ELOG:TIM OFF')
+        ts_read = self._getElogTimestamp()
+        return send_ok
 
     def fetchElog(self):
         data = self._askRaw(':ELOG:FETCH?')
@@ -619,7 +633,9 @@ class OxygenSCPI:
         if ' ' in data:
             data = data.split(' ')[1]
         data = data.split(',')
-        num_ch = len(self.elogChannelList)+1
+        num_ch = len(self.elogChannelList)
+        if self._elogTimestamp in ('REL', 'ABS', 'ELOG'):
+            num_ch += 1
         #print(len(data)/(1.0*num_ch), data)
         num_items = int(len(data)/num_ch)
         data = [data[i*num_ch:i*num_ch+num_ch] for i in range(num_items)]
@@ -633,7 +649,7 @@ class OxygenSCPI:
         if time is None:
             return self._sendRaw(':MARK:ADD "{:s}","{:s}"'.format(label, description))
         return self._sendRaw(':MARK:ADD "{:s}","{:s}",{:f}'.format(label, description, time))
-    
+
     def getChannelList(self):
         ret = self._askRaw(':CHANNEL:NAMES?')
         if ret:
@@ -657,7 +673,7 @@ class OxygenSCPI:
             return ch_dict
         else:
             return None
-        
+
     def getChannelPropValue(self, channel_id, prop):
         if type(channel_id) == int:
             channel_id = str(channel_id)
@@ -666,7 +682,7 @@ class OxygenSCPI:
             return ret.decode().strip()
         else:
             return None
-        
+
     def getChannelPropNames(self, channel_id):
         if type(channel_id) == int:
             channel_id = str(channel_id)
@@ -675,18 +691,18 @@ class OxygenSCPI:
             return ret.decode().strip().replace('"','').split(",")
         else:
             return None
-        
+
     def setChannelPropValue(self, channel_id, prop, val):
         if type(channel_id) == int:
             channel_id = str(channel_id)
         self._sendRaw(f':CHANNEL:PROP "{channel_id:s}","{prop:s}","{val:s}"')
-        
 
-# TODO: Better add and remove data stream instances            
+
+# TODO: Better add and remove data stream instances
 class OxygenScpiDataStream(object):
     def __init__(self, oxygen):
         self.oxygen = oxygen
-        
+
     def setItems(self, channelNames, streamGroup=1):
         """ Set Datastream Items to be transfered
         """
@@ -715,11 +731,11 @@ class OxygenScpiDataStream(object):
                 return True
         else:
             return False
-        
+
     def setTcpPort(self, tcp_port, streamGroup=1):
         self.oxygen._sendRaw(':DST:PORT{:d} {:d}'.format(streamGroup, tcp_port))
         return True
-        
+
     def init(self, streamGroup=1):
         if streamGroup == 'all':
             self.oxygen._sendRaw(':DST:INIT {:s}'.format(streamGroup))
@@ -728,7 +744,7 @@ class OxygenScpiDataStream(object):
         else:
             return False
         return True
-    
+
     def start(self, streamGroup=1):
         if streamGroup == 'all':
             self.oxygen._sendRaw(':DST:START ALL')
@@ -737,7 +753,7 @@ class OxygenScpiDataStream(object):
         else:
             return False
         return True
-    
+
     def stop(self, streamGroup=1):
         if streamGroup == 'all':
             self.oxygen._sendRaw(':DST:STOP ALL')
@@ -746,7 +762,7 @@ class OxygenScpiDataStream(object):
         else:
             return False
         return True
-    
+
     def getState(self, streamGroup=1):
         ret = self.oxygen._askRaw(':DST:STAT{:d}?'.format(streamGroup))
         if isinstance(ret, bytes):
@@ -755,13 +771,13 @@ class OxygenScpiDataStream(object):
             return ret
         else:
             return False
-        
+
     def setTriggered(self, streamGroup=1, value=True):
         if value:
             self.oxygen._sendRaw(':DST:TRIG{:d} ON'.format(streamGroup))
         else:
             self.oxygen._sendRaw(':DST:TRIG{:d} OFF'.format(streamGroup))
-        
+
     def reset(self):
         self.oxygen._sendRaw(':DST:RESET')
 
@@ -810,16 +826,16 @@ class OxygenChannelProperties(object):
             return self.oxygen.getChannelPropValue(ch_id, 'Neon/DomainUrl').split(',')[1].replace(')','').strip('"')
         except:
             return ""
-    
+
     def getChannelLPFilterFreq(self, ch_id):
         """
-        Possible Values for ret: 
+        Possible Values for ret:
         - NONE
         - (SCALAR,20000.0,"Hz")
         - (STRING,"Auto")
         - (STRING,"Off")
         """
-        try: 
+        try:
             ret = self.oxygen.getChannelPropValue(ch_id, 'LP_Filter_Freq')
             if ret == "NONE":
                 return None
@@ -868,14 +884,14 @@ class OxygenChannelProperties(object):
         except:
             ret = 0.0
         return ret
-    
+
     def setTrionOutputFgenAmplitude(self, ch_id, amplitude, unit="V", amplitude_type="RMS"):
         self.oxygen.setChannelPropValue(ch_id, "AmplitudeValue", amplitude_type)
         self.oxygen.setChannelPropValue(ch_id, "TRION/Amplitude", f"{amplitude:f} {unit:s}")
 
     def setTrionOutputFgenOffset(self, ch_id, offset, unit="V"):
         self.oxygen.setChannelPropValue(ch_id, "TRION/Offset", f"{offset:f} {unit:s}")
-    
+
     def setTrionOutputFgenFrequency(self, ch_id, frequency):
         self.oxygen.setChannelPropValue(ch_id, "TRION/Frequency", f"{frequency:f} Hz")
 
