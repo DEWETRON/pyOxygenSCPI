@@ -40,12 +40,10 @@ class OxygenSCPI:
         #self.connect()
         self._headersActive = True
         self.channelList = []
-        self._getTransferChannels()
         self._scpi_version = (1,5)
         self._value_dimension = None
         self._value_format = self.NumberFormat.ASCII
         self.elogChannelList = []
-        self._getElogChannels()
         self._localElogStartTime = dt.datetime.now()
         self.DataStream = OxygenScpiDataStream(self)
         self.ChannelProperties = OxygenChannelProperties(self)
@@ -61,6 +59,8 @@ class OxygenSCPI:
                 self._sock = sock
                 self.headersOff()
                 self.getVersion()
+                self._getTransferChannels(False)
+                self._getElogChannels(False)
                 return True
             except ConnectionRefusedError as msg:
                 template = "Connection to {!s}:{:d} refused: {!s}"
@@ -176,13 +176,16 @@ class OxygenSCPI:
         """
         return self._sendRaw(':SETUP:LOAD "{:s}"'.format(setup_name))
 
-    def _getTransferChannels(self):
+    def _getTransferChannels(self, add_log=True):
         """Reads the channels to be transferred within the numeric system.
 
         This function reads the actual list of channels to be transferred within
         the numeric system and updates the attribute 'channelNames' with a list
         of strings containing the actual channel names. It is called at
         __init__ to get the previously set channels.
+
+        Args:
+            add_log (bool): Indicate in function should log or not.
 
         Returns:
             True if Suceeded, False if not
@@ -194,10 +197,12 @@ class OxygenSCPI:
             channelNames = ret.split('","')
             channelNames = [chName.replace('"','') for chName in channelNames]
             if len(channelNames) == 1:
-                log.debug('One Channel Set: {:s}'.format(channelNames[0]))
+                if add_log:
+                    log.debug('One Channel Set: {:s}'.format(channelNames[0]))
                 if channelNames[0] == 'NONE':
                     channelNames = []
-                    log.warning('No Channel Set')
+                    if add_log:
+                        log.warning('No Channel Set')
             self.channelList = channelNames
             ret = self.setNumberChannels()
             if not ret:
@@ -507,13 +512,16 @@ class OxygenSCPI:
             state = ret.decode().strip()
             return self.AcquisitionState(state)
 
-    def _getElogChannels(self):
+    def _getElogChannels(self, add_log=True):
         """Reads the channels to be transfered within the ELOG system.
         
         This function reads the actual list of channels to be transferred within
         the ELOG system and updates the attribute 'elogChannelList' with a list
         of strings containing the actual elog channel names. It is called at
         __init__ to get the previously set channels.
+
+        Args:
+            add_log (bool): Indicate in function should log or not.
 
         Returns:
             True if Suceeded, False if not
@@ -525,10 +533,12 @@ class OxygenSCPI:
             channel_names = ret.split('","')
             channel_names = [ch_name.replace('"','') for ch_name in channel_names]
             if len(channel_names) == 1:
-                log.debug('One Channel Set: {:s}'.format(channel_names[0]))
+                if add_log:
+                    log.debug('One Channel Set: {:s}'.format(channel_names[0]))
                 if channel_names[0] == 'NONE':
                     channel_names = []
-                    log.warning('No Channel Set')
+                    if add_log:
+                        log.warning('No Channel Set')
             self.elogChannelList = channel_names
             if len(channel_names) == 0:
                 return False
