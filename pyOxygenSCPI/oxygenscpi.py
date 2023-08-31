@@ -608,7 +608,7 @@ class OxygenSCPI:
         ret = self._askRaw(':ELOG:TIM?')
         if isinstance(ret, bytes):
             ret = ret.decode().strip()
-            self._elogTimestamp = ret
+            self.elogTimestamp = ret
             return ret
         return False
 
@@ -621,7 +621,7 @@ class OxygenSCPI:
         ts_read = self._getElogTimestamp()
         return send_ok
 
-    def fetchElog(self):
+    def fetchElog(self, raw_string=True):
         data = self._askRaw(':ELOG:FETCH?')
         if type(data) is bytes:
             data = data.decode()
@@ -634,12 +634,44 @@ class OxygenSCPI:
             data = data.split(' ')[1]
         data = data.split(',')
         num_ch = len(self.elogChannelList)
-        if self._elogTimestamp in ('REL', 'ABS', 'ELOG'):
+        if self.elogTimestamp in ('REL', 'ABS', 'ELOG'):
             num_ch += 1
         #print(len(data)/(1.0*num_ch), data)
         num_items = int(len(data)/num_ch)
         data = [data[i*num_ch:i*num_ch+num_ch] for i in range(num_items)]
+        if not raw_string:
+            for i, row in enumerate(data):
+                data[i] = self._convertElogArray(row)
         return data
+
+    def _convertElogArray(self, data_array):
+        """Converts a single array from fetchElog string values into float.
+        
+        If the Elog timestamp is set to 'ABS' then the first value of the array
+        is converted into datetime object.
+
+        Args:
+        data_array : list of strings
+            List containing single array of string measurements from fetchElog.
+
+        Returns:
+            List with value types converted to float (datetime for value at
+            index 0 if timestamp is ABS).
+        """
+        # When ELOG timestamp is set to ABS, the first value of a row is a
+        # datetime string and the remaining values are strings that can
+        # be converted to floating point numbers.
+        if self.elogTimestamp == "ABS":
+            new_array = []
+            dtime = data_array[0].replace('"', '')
+            # Oxygen's datetime with whole seconds does not display microseconds
+            # for those cases the ".%f" formatting is excluded.
+            fmt = '%Y-%m-%dT%H:%M:%S.%f' if '.' in dtime else '%Y-%m-%dT%H:%M:%S'
+            new_array.append(dt.datetime.strptime(dtime, fmt))
+            new_array.extend(float(value) for value in data_array[1:])
+        else:
+            new_array = [float(value) for value in data_array]
+        return new_array
 
     def addMarker(self, label, description=None, time=None):
         if description is None and time is None:
