@@ -202,7 +202,7 @@ class OxygenSCPI:
             ret = self.setNumberChannels()
             if not ret:
                 return False
-            if is_minimum_version(self._scpi_version, (1,6)):
+            if is_minimum_version(self._scpi_version, (1,6)) and channelNames:
                 return self.getValueDimensions()
             return True
         return False
@@ -281,18 +281,22 @@ class OxygenSCPI:
         """ Read the Dimension of the output
         Available since 1.6
         """
-        ret = self._askRaw(':NUM:NORM:DIMS?')
-        if isinstance(ret, bytes):
-            dim = ret.decode()
-            if ' ' in dim:
-                dim = dim.split(' ')[1]
-            dim = dim.split(',')
-            try:
-                self._value_dimension = [int(d) for d in dim]
-            except TypeError:
-                self._value_dimension = False
-                return False
-            return True
+        # Asking for command ":NUM:NORM:DIMS?" times out when there are no
+        # transfer channels selected.
+        if self.channelList:
+            ret = self._askRaw(':NUM:NORM:DIMS?')
+            if isinstance(ret, bytes):
+                dim = ret.decode()
+                if ' ' in dim:
+                    dim = dim.split(' ')[1]
+                dim = dim.split(',')
+                try:
+                    self._value_dimension = [int(d) for d in dim]
+                except TypeError:
+                    self._value_dimension = False
+                    return False
+                return True
+            return False
         return False
 
     def setValueMaxDimensions(self):
