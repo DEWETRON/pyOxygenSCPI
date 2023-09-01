@@ -44,6 +44,7 @@ class OxygenSCPI:
         self._value_dimension = None
         self._value_format = self.NumberFormat.ASCII
         self.elogChannelList = []
+        self.elogTimestamp = "OFF"
         self._localElogStartTime = dt.datetime.now()
         self.DataStream = OxygenScpiDataStream(self)
         self.ChannelProperties = OxygenChannelProperties(self)
