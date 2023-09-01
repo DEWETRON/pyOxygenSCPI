@@ -673,6 +673,67 @@ class OxygenSCPI:
             new_array = [float(value) for value in data_array]
         return new_array
 
+    def fetchElogAccumulated(self, timeout=10):
+        """Fetch ELOG until the actual timestamp is reached.
+
+        This function blocks the execution and keeps fetching elog values until
+        a fetched timestamp is higher than the timestamp saved at the moment in
+        which the function was called. If called right after starting the
+        external logging, it is possible that the function needs longer because
+        the update of the Dewetron's buffer is not instantaneous.
+
+        Depending on the internet connection, the function itself can take a few
+        seconds to be excecuted.
+        
+        It requires the elog timestamp to be either 'ABS' or 'ELOG'.
+        - With 'ABS' timestamp, the stop condition will compare the absolute
+        timestamp from the system executing the function with the timestamp from
+        the operating system in which Oxygen is running.
+        - With 'ELOG' timestamp, the stop condition will be met when the fetched
+        timestamp added to the timestamp in which the startElog function was
+        called (tracked by _localElogStartTime) attribute is higher than the
+        timestamp from execution of the function.
+
+        Args:
+            timeout (float): timeout for the accumulated fetching.
+
+        Returns:
+            List of lists (matrix like) containing the accumulated fetched values
+            converted to float (datetime for values at first column if timestamp
+            is ABS.)
+        """
+
+        call_tstamp = dt.datetime.now()
+
+        def stopCondition(tstamp):
+            """Checks if the measured timestamp has reached the call timestamp.
+            """
+            # Case for ELOG timestamp
+            if self.elogTimestamp == "ELOG":
+                tstamp = float(tstamp)
+                return self._localElogStartTime + dt.timedelta(seconds=tstamp) >= call_tstamp
+            # Case for ABS timestmap
+            tstamp = tstamp.replace('"','')
+            tstamp = dt.datetime.strptime(tstamp, '%Y-%m-%dT%H:%M:%S.%f')
+            return tstamp >= call_tstamp
+
+        # This function works only for ELOG and ABS timestamps
+        if self.elogTimestamp in ("ELOG", "ABS"):
+            combined_fetch = []
+            while dt.datetime.now() - call_tstamp < dt.timedelta(seconds=timeout):
+                data = self.fetchElog()
+                # Keep fetching until data is received
+                if not data:
+                    sleep(0.001)
+                    continue
+                combined_fetch.extend(data)
+                # Check if last fetched value reaches the call timestamp.
+                if stopCondition(combined_fetch[-1][0]):
+                    for i, row in enumerate(combined_fetch):
+                        combined_fetch[i] = self._convertElogArray(row)
+                    return combined_fetch
+        return False
+
     def addMarker(self, label, description=None, time=None):
         if description is None and time is None:
             return self._sendRaw(':MARK:ADD "{:s}"'.format(label))
