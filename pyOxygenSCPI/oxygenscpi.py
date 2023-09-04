@@ -719,20 +719,23 @@ class OxygenSCPI:
             return tstamp >= call_tstamp
 
         # This function works only for ELOG and ABS timestamps
-        if self.elogTimestamp in ("ELOG", "ABS"):
-            combined_fetch = []
-            while dt.datetime.now() - call_tstamp < dt.timedelta(seconds=timeout):
-                data = self.fetchElog()
-                # Keep fetching until data is received
-                if not data:
-                    sleep(0.05)
-                    continue
-                combined_fetch.extend(data)
-                # Check if last fetched value reaches the call timestamp.
-                if stopCondition(combined_fetch[-1][0]):
-                    for i, row in enumerate(combined_fetch):
-                        combined_fetch[i] = self._convertElogArray(row)
-                    return combined_fetch
+        if self.elogTimestamp not in ("ELOG", "ABS"):
+            raise Exception("fetchElogAccumulated is only allowed for "
+                            "'ELOG' and 'ABS' timestamp configuration.")
+        combined_fetch = []
+        while dt.datetime.now() - call_tstamp < dt.timedelta(seconds=timeout):
+            data = self.fetchElog()
+            # Keep fetching until data is received
+            if not data:
+                sleep(0.05)
+                continue
+            combined_fetch.extend(data)
+            # Check if last fetched value reaches the call timestamp.
+            if stopCondition(combined_fetch[-1][0]):
+                for i, row in enumerate(combined_fetch):
+                    combined_fetch[i] = self._convertElogArray(row)
+                return combined_fetch
+        print("fetchElogAccumulated timed out.")
         return False
 
     def addMarker(self, label, description=None, time=None):
