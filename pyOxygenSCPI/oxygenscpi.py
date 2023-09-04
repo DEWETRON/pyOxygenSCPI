@@ -251,7 +251,7 @@ class OxygenSCPI:
         Available since 1.20
         """
         if not is_minimum_version(self._scpi_version, (1,20)):
-            raise NotImplementedError(":NUM:NORMAL:FORMAT requires protocol version 1.20");
+            raise NotImplementedError(":NUM:NORMAL:FORMAT requires protocol version 1.20")
 
         if format == self.NumberFormat.BINARY_INTEL:
             fmt = "BIN_INTEL"
@@ -269,7 +269,7 @@ class OxygenSCPI:
         Available since 1.20
         """
         if not is_minimum_version(self._scpi_version, (1,20)):
-            raise NotImplementedError(":NUM:NORMAL:FORMAT? requires protocol version 1.20");
+            raise NotImplementedError(":NUM:NORMAL:FORMAT? requires protocol version 1.20")
 
         ret = self._askRaw(':NUM:NORM:FORMAT?')
         if isinstance(ret, bytes):
@@ -278,9 +278,9 @@ class OxygenSCPI:
                 format = format.split(' ')[1].rstrip()
             if format == "ASCII":
                 return self.NumberFormat.ASCII
-            elif format == "BIN_INTEL":
+            if format == "BIN_INTEL":
                 return self.NumberFormat.BINARY_INTEL
-            elif format == "BIN_MOTOROLA":
+            if format == "BIN_MOTOROLA":
                 return self.NumberFormat.BINARY_MOTOROLA
         raise Exception("Invalid NumberFormat")
 
@@ -750,8 +750,7 @@ class OxygenSCPI:
             ch_str_list = ret.decode().strip()
             ch_list = [item.replace('(','').replace(')','').replace('"','').split(',') for item in ch_str_list.split('),(')]
             return ch_list
-        else:
-            return None
+        return None
 
     def getChannelListDict(self, key="ChannelName"):
         ch_list = self.getChannelList()
@@ -765,8 +764,8 @@ class OxygenSCPI:
                 else:
                     ch_dict[ch[0]] = ch[1]
             return ch_dict
-        else:
-            return None
+
+        return None
 
     def getChannelPropValue(self, channel_id, prop):
         if type(channel_id) == int:
@@ -774,8 +773,7 @@ class OxygenSCPI:
         ret = self._askRaw(f':CHANNEL:PROP? "{channel_id:s}","{prop:s}"')
         if ret:
             return ret.decode().strip()
-        else:
-            return None
+        return None
 
     def getChannelPropNames(self, channel_id):
         if type(channel_id) == int:
@@ -783,17 +781,15 @@ class OxygenSCPI:
         ret = self._askRaw(f':CHANNEL:ITEM{channel_id:s}:ATTR:NAMES?')
         if ret:
             return ret.decode().strip().replace('"','').split(",")
-        else:
-            return None
+        return None
 
     def setChannelPropValue(self, channel_id, prop, val):
         if type(channel_id) == int:
             channel_id = str(channel_id)
         self._sendRaw(f':CHANNEL:PROP "{channel_id:s}","{prop:s}","{val:s}"')
 
-
 # TODO: Better add and remove data stream instances
-class OxygenScpiDataStream(object):
+class OxygenScpiDataStream:
     def __init__(self, oxygen):
         self.oxygen = oxygen
 
@@ -821,10 +817,10 @@ class OxygenScpiDataStream(object):
             self.ChannelList = channelNames
             if len(channelNames) == 0:
                 return False
-            else:
-                return True
-        else:
-            return False
+
+            return True
+
+        return False
 
     def setTcpPort(self, tcp_port, streamGroup=1):
         self.oxygen._sendRaw(':DST:PORT{:d} {:d}'.format(streamGroup, tcp_port))
@@ -863,8 +859,7 @@ class OxygenScpiDataStream(object):
             ret = ret.decode().strip()
             ret = ret.replace(':DST:STAT ','')
             return ret
-        else:
-            return False
+        return False
 
     def setTriggered(self, streamGroup=1, value=True):
         if value:
@@ -875,7 +870,7 @@ class OxygenScpiDataStream(object):
     def reset(self):
         self.oxygen._sendRaw(':DST:RESET')
 
-class OxygenChannelProperties(object):
+class OxygenChannelProperties:
     class OutputMode(Enum):
         FUNCTION_GENERATOR = "FunctionGenerator"
         CONSTANT = "ConstOutput"
@@ -895,25 +890,25 @@ class OxygenChannelProperties(object):
         try:
             return float(self.oxygen.getChannelPropValue(ch_id, 'SampleRate').split(',')[1].replace(')',''))
         except:
-           return None
+            return None
 
     def getTrionSlotNumber(self, ch_id):
         try:
             return int(self.oxygen.getChannelPropValue(ch_id, 'ID:TRION/SlotNumber').split(',')[1].replace(')',''))
         except:
-           return None
+            return None
 
     def getTrionBoardId(self, ch_id):
         try:
             return int(self.oxygen.getChannelPropValue(ch_id, 'ID:TRION/BoardId').split(',')[1].replace(')',''))
         except:
-           return None
+            return None
 
     def getTrionChannelIndex(self, ch_id):
         try:
             return int(self.oxygen.getChannelPropValue(ch_id, 'ID:TRION/ChannelIndex').split(',')[1].replace(')',''))
         except:
-           return None
+            return None
 
     def getChannelDomainName(self, ch_id):
         try:
@@ -936,17 +931,17 @@ class OxygenChannelProperties(object):
             ret_parts = ret.replace("(","").replace(")","").split(",")
             if ret_parts[0] == "STRING":
                 return ret_parts[1].replace('"',"")
-            elif ret_parts[0] == "SCALAR":
+            if ret_parts[0] == "SCALAR":
                 return float(ret_parts[1])
         except:
-            return None
+            pass
+        return None
 
     def getChannelUsed(self, ch_id):
         ret = self.oxygen.getChannelPropValue(ch_id, 'Used').split(',')[1].strip(')"')
         if ret == "OFF":
             return False
-        else:
-            return True
+        return True
 
     def getChannelRange(self, ch_id):
         try:
@@ -983,13 +978,13 @@ class OxygenChannelProperties(object):
         self.oxygen.setChannelPropValue(ch_id, "AmplitudeValue", amplitude_type)
         self.oxygen.setChannelPropValue(ch_id, "TRION/Amplitude", f"{amplitude:f} {unit:s}")
 
-    def setTrionOutputFgenOffset(self, ch_id, offset, unit="V"):
+    def setTrionOutputFgenOffset(self, ch_id, offset, unit: str="V"):
         self.oxygen.setChannelPropValue(ch_id, "TRION/Offset", f"{offset:f} {unit:s}")
 
     def setTrionOutputFgenFrequency(self, ch_id, frequency):
         self.oxygen.setChannelPropValue(ch_id, "TRION/Frequency", f"{frequency:f} Hz")
 
-    def setTrionOutputResolution(self, ch_id, resolution):
+    def setTrionOutputResolution(self, ch_id, resolution: str):
         """
         resolution, str, 'HighSpeed' or 'HighResolution'
         """
