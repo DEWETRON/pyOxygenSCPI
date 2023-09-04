@@ -12,6 +12,7 @@ from enum import Enum
 from struct import unpack
 from time import sleep
 from contextlib import contextmanager
+from typing import Union, Literal
 
 log = logging.getLogger('oxygenscpi')
 
@@ -622,7 +623,13 @@ class OxygenSCPI:
         ts_read = self._getElogTimestamp()
         return send_ok
 
-    def fetchElog(self, raw_string=True):
+    def fetchElog(self,
+                  raw_string: bool = True
+                  ) -> Union[
+                      list[list[str]],
+                      list[Union[dt.datetime, float]],
+                      Literal[False]
+                      ]:
         data = self._askRaw(':ELOG:FETCH?')
         if type(data) is bytes:
             data = data.decode()
@@ -645,7 +652,9 @@ class OxygenSCPI:
                 data[i] = self._convertElogArray(row)
         return data
 
-    def _convertElogArray(self, data_array):
+    def _convertElogArray(self,
+                          data_array: list[str]
+                          ) -> list[Union[dt.datetime, float]]:
         """Converts a single array from fetchElog string values into float.
         
         If the Elog timestamp is set to 'ABS' then the first value of the array
@@ -674,7 +683,12 @@ class OxygenSCPI:
             new_array = [float(value) for value in data_array]
         return new_array
 
-    def fetchElogAccumulated(self, timeout=10):
+    def fetchElogAccumulated(self,
+                             timeout: float = 10
+                             ) -> Union[
+                                 list[list[Union[float, dt.datetime]]],
+                                 Literal[False]
+                                 ]:
         """Fetch ELOG until the actual timestamp is reached.
 
         This function blocks the execution and keeps fetching elog values until
@@ -706,7 +720,7 @@ class OxygenSCPI:
 
         call_tstamp = dt.datetime.now()
 
-        def stopCondition(tstamp):
+        def stopCondition(tstamp) -> bool:
             """Checks if the measured timestamp has reached the call timestamp.
             """
             # Case for ELOG timestamp
