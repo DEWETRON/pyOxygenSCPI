@@ -696,7 +696,7 @@ class OxygenSCPI:
         timestamp from execution of the function.
 
         Args:
-            timeout (float): timeout for the accumulated fetching.
+            timeout (float): timeout for the accumulated fetching in seconds.
 
         Returns:
             List of lists (matrix like) containing the accumulated fetched values
@@ -725,7 +725,7 @@ class OxygenSCPI:
                 data = self.fetchElog()
                 # Keep fetching until data is received
                 if not data:
-                    sleep(0.001)
+                    sleep(0.05)
                     continue
                 combined_fetch.extend(data)
                 # Check if last fetched value reaches the call timestamp.
