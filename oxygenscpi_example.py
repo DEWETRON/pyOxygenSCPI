@@ -60,8 +60,14 @@ data1 = mDevice.fetchElog()
 data2 = mDevice.fetchElog()
 mDevice.stopElog()
 print("Elog stopped.")
-print(f"First Elog row values fetched: {data1[0]}")
-print(f"Last Elog row values fetched: {data2[-1]}")
+if data1:
+    print(f"First Elog row values fetched: {data1[0]}")
+else:
+    print("Unable to fetch Elog.")
+if data2:
+    print(f"Last Elog row values fetched: {data2[-1]}")
+else:
+    print("Unable to fetch Elog.")
 
 # Alternatively Start elog with context manager and accumulating values
 # for 10 seconds
@@ -73,6 +79,9 @@ with mDevice.elogContext():
     print("Fetching Elog")
     data = mDevice.fetchElogAccumulated()
 print("Elog stopped.")
-print(f"Fetched Elog from timestamp {data[0][0]} to {data[-1][0]}s.")
+if data:
+    print(f"Fetched Elog from timestamp {data[0][0]} to {data[-1][0]}s.")
+else:
+    print("Unable to fetch Elog.")
 
 mDevice.disconnect()
