@@ -47,4 +47,41 @@ time.sleep(5)
 mDevice.storeStop()
 print("Recording stopped.")
 
+# Set Elog channels and fetch some elog data
+mDevice.setElogChannels(["AI 4/I1","AI 4/I2"])
+mDevice.setElogTimestamp('ABS')
+mDevice.setElogPeriod(0.01)
+print("Starting Elog")
+mDevice.startElog()
+print("Waiting for 10 seconds...")
+time.sleep(10)
+print("Fetching elog Data")
+data1 = mDevice.fetchElog()
+data2 = mDevice.fetchElog()
+mDevice.stopElog()
+print("Elog stopped.")
+if data1:
+    print(f"First Elog row values fetched: {data1[0]}")
+else:
+    print("Unable to fetch Elog.")
+if data2:
+    print(f"Last Elog row values fetched: {data2[-1]}")
+else:
+    print("Unable to fetch Elog.")
+
+# Alternatively Start elog with context manager and accumulating values
+# for 10 seconds
+print("Starting Elog with context manager")
+mDevice.setElogTimestamp('ELOG')
+with mDevice.elogContext():
+    print("Waiting for 10 seconds...")
+    time.sleep(10)
+    print("Fetching Elog")
+    data = mDevice.fetchElogAccumulated()
+print("Elog stopped.")
+if data:
+    print(f"Fetched Elog from timestamp {data[0][0]} to {data[-1][0]}s.")
+else:
+    print("Unable to fetch Elog.")
+
 mDevice.disconnect()

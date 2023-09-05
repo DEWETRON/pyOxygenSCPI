@@ -11,6 +11,8 @@ import datetime as dt
 from enum import Enum
 from struct import unpack
 from time import sleep
+from contextlib import contextmanager
+from typing import Union, Literal
 
 log = logging.getLogger('oxygenscpi')
 
@@ -43,6 +45,8 @@ class OxygenSCPI:
         self._value_dimension = None
         self._value_format = self.NumberFormat.ASCII
         self.elogChannelList = []
+        self.elogTimestamp = "OFF"
+        self._localElogStartTime = dt.datetime.now()
         self.DataStream = OxygenScpiDataStream(self)
         self.ChannelProperties = OxygenChannelProperties(self)
 
@@ -57,6 +61,9 @@ class OxygenSCPI:
                 self._sock = sock
                 self.headersOff()
                 self.getVersion()
+                self._getTransferChannels(False)
+                self._getElogChannels(False)
+                self._getElogTimestamp()
                 return True
             except ConnectionRefusedError as msg:
                 template = "Connection to {!s}:{:d} refused: {!s}"
@@ -172,6 +179,42 @@ class OxygenSCPI:
         """
         return self._sendRaw(':SETUP:LOAD "{:s}"'.format(setup_name))
 
+    def _getTransferChannels(self, add_log=True):
+        """Reads the channels to be transferred within the numeric system.
+
+        This function reads the actual list of channels to be transferred within
+        the numeric system and updates the attribute 'channelNames' with a list
+        of strings containing the actual channel names. It is called at
+        __init__ to get the previously set channels.
+
+        Args:
+            add_log (bool): Indicate in function should log or not.
+
+        Returns:
+            True if Suceeded, False if not
+        """
+        ret = self._askRaw(':NUM:NORMAL:ITEMS?')
+        if isinstance(ret, bytes):
+            ret = ret.decode().strip()
+            ret = ret.replace(':NUM:ITEMS ','')
+            channelNames = ret.split('","')
+            channelNames = [chName.replace('"','') for chName in channelNames]
+            if len(channelNames) == 1:
+                if add_log:
+                    log.debug('One Channel Set: {:s}'.format(channelNames[0]))
+                if channelNames[0] == 'NONE':
+                    channelNames = []
+                    if add_log:
+                        log.warning('No Channel Set')
+            self.channelList = channelNames
+            ret = self.setNumberChannels()
+            if not ret:
+                return False
+            if is_minimum_version(self._scpi_version, (1,6)) and channelNames:
+                return self.getValueDimensions()
+            return True
+        return False
+
     def setTransferChannels(self, channelNames, includeRelTime=False, includeAbsTime=False):
         """Sets the channels to be transfered within the numeric system
 
@@ -189,27 +232,9 @@ class OxygenSCPI:
         if includeAbsTime:
             channelNames.insert(0, "ABS-TIME")
         channelListStr = '"'+'","'.join(channelNames)+'"'
-        ret = self._sendRaw(':NUM:NORMAL:ITEMS {:s}'.format(channelListStr))
+        self._sendRaw(':NUM:NORMAL:ITEMS {:s}'.format(channelListStr))
         # Read back actual set channel names
-        ret = self._askRaw(':NUM:NORMAL:ITEMS?')
-        if isinstance(ret, bytes):
-            ret = ret.decode().strip()
-            ret = ret.replace(':NUM:ITEMS ','')
-            channelNames = ret.split('","')
-            channelNames = [chName.replace('"','') for chName in channelNames]
-            if len(channelNames) == 1:
-                log.debug('One Channel Set: {:s}'.format(channelNames[0]))
-                if channelNames[0] == 'NONE':
-                    channelNames = []
-                    log.warning('No Channel Set')
-            self.channelList = channelNames
-            ret = self.setNumberChannels()
-            if not ret:
-                return False
-            if is_minimum_version(self._scpi_version, (1,6)):
-                return self.getValueDimensions()
-            return True
-        return False
+        return self._getTransferChannels()
 
     def setNumberChannels(self, number=None):
         if number is None:
@@ -264,18 +289,22 @@ class OxygenSCPI:
         """ Read the Dimension of the output
         Available since 1.6
         """
-        ret = self._askRaw(':NUM:NORM:DIMS?')
-        if isinstance(ret, bytes):
-            dim = ret.decode()
-            if ' ' in dim:
-                dim = dim.split(' ')[1]
-            dim = dim.split(',')
-            try:
-                self._value_dimension = [int(d) for d in dim]
-            except TypeError:
-                self._value_dimension = False
-                return False
-            return True
+        # Asking for command ":NUM:NORM:DIMS?" times out when there are no
+        # transfer channels selected.
+        if self.channelList:
+            ret = self._askRaw(':NUM:NORM:DIMS?')
+            if isinstance(ret, bytes):
+                dim = ret.decode()
+                if ' ' in dim:
+                    dim = dim.split(' ')[1]
+                dim = dim.split(',')
+                try:
+                    self._value_dimension = [int(d) for d in dim]
+                except TypeError:
+                    self._value_dimension = False
+                    return False
+                return True
+            return False
         return False
 
     def setValueMaxDimensions(self):
@@ -486,6 +515,39 @@ class OxygenSCPI:
             state = ret.decode().strip()
             return self.AcquisitionState(state)
 
+    def _getElogChannels(self, add_log=True):
+        """Reads the channels to be transfered within the ELOG system.
+
+        This function reads the actual list of channels to be transferred within
+        the ELOG system and updates the attribute 'elogChannelList' with a list
+        of strings containing the actual elog channel names. It is called at
+        __init__ to get the previously set channels.
+
+        Args:
+            add_log (bool): Indicate in function should log or not.
+
+        Returns:
+            True if Suceeded, False if not
+        """
+        ret = self._askRaw(':ELOG:ITEMS?')
+        if isinstance(ret, bytes):
+            ret = ret.decode().strip()
+            ret = ret.replace(':ELOG:ITEM ','')
+            channel_names = ret.split('","')
+            channel_names = [ch_name.replace('"','') for ch_name in channel_names]
+            if len(channel_names) == 1:
+                if add_log:
+                    log.debug('One Channel Set: {:s}'.format(channel_names[0]))
+                if channel_names[0] == 'NONE':
+                    channel_names = []
+                    if add_log:
+                        log.warning('No Channel Set')
+            self.elogChannelList = channel_names
+            if len(channel_names) == 0:
+                return False
+            return True
+        return False
+
     def setElogChannels(self, channel_names):
         """Sets the channels to be transfered within the ELOG system
 
@@ -503,27 +565,13 @@ class OxygenSCPI:
             return False
 
         channel_list_str = '"'+'","'.join(channel_names)+'"'
-        ret = self._sendRaw(':ELOG:ITEMS {:s}'.format(channel_list_str))
+        self._sendRaw(':ELOG:ITEMS {:s}'.format(channel_list_str))
         sleep(0.1)
         # Read back actual set channel names
-        ret = self._askRaw(':ELOG:ITEMS?')
-        if isinstance(ret, bytes):
-            ret = ret.decode().strip()
-            ret = ret.replace(':ELOG:ITEM ','')
-            channel_names = ret.split('","')
-            channel_names = [ch_name.replace('"','') for ch_name in channel_names]
-            if len(channel_names) == 1:
-                log.debug('One Channel Set: {:s}'.format(channel_names[0]))
-                if channel_names[0] == 'NONE':
-                    channel_names = []
-                    log.warning('No Channel Set')
-            self.elogChannelList = channel_names
-            if len(channel_names) == 0:
-                return False
-            return True
-        return False
+        return self._getElogChannels()
 
     def startElog(self):
+        self._localElogStartTime = dt.datetime.now()
         return self._sendRaw(':ELOG:START')
 
     def setElogPeriod(self, period):
@@ -532,30 +580,177 @@ class OxygenSCPI:
     def stopElog(self):
         return self._sendRaw(':ELOG:STOP')
 
-    def setElogTimestamp(self, tsType='REL'):
-        if tsType == 'REL':
-            return self._sendRaw(':ELOG:TIM REL')
-        if tsType == 'ABS':
-            return self._sendRaw(':ELOG:TIM ABS')
-        return self._sendRaw(':ELOG:TIM OFF')
+    @contextmanager
+    def elogContext(self):
+        """Safely starts and stops external logging.
 
-    def fetchElog(self):
+        This function should be used in a with statement to start external
+        logging and immediately stops it when either exiting the context
+        or when an Exception occurs within the context.
+
+        Example usage:
+            with mDevice.startElog():
+                # Here elog is started
+                time.sleep(10)
+                data = mDevice.fetchElog()
+            # Here elog is stopped
+        """
+        try:
+            self.startElog()
+            yield
+        finally:
+            self.stopElog()
+
+    def _getElogTimestamp(self):
+        """Get external logging configured timestamp.
+
+        Returns:
+            External logging timestamp string obtained from ':ELOG:TIM?'
+        """
+        ret = self._askRaw(':ELOG:TIM?')
+        if isinstance(ret, bytes):
+            ret = ret.decode().strip()
+            self.elogTimestamp = ret
+            return ret
+        return False
+
+    def setElogTimestamp(self, tsType='REL'):
+        if tsType in ('REL', 'ABS', 'ELOG'):
+            self._sendRaw(f':ELOG:TIM {tsType}')
+            ts_read = self._getElogTimestamp()
+            return ts_read == tsType
+        send_ok = self._sendRaw(':ELOG:TIM OFF')
+        ts_read = self._getElogTimestamp()
+        return send_ok
+
+    def fetchElog(self,
+                  raw_string: bool = True
+                  ) -> Union[
+                      list[list[str]],
+                      list[Union[dt.datetime, float]],
+                      Literal[False]
+                      ]:
         data = self._askRaw(':ELOG:FETCH?')
         if type(data) is bytes:
             data = data.decode()
         else:
             return False
-        if 'NONE' in data:
+        if any(d in data for d in ('NONE', 'ERROR')):
             return False
         # Remove Header if Whitespace present
         if ' ' in data:
             data = data.split(' ')[1]
         data = data.split(',')
-        num_ch = len(self.elogChannelList)+1
+        num_ch = len(self.elogChannelList)
+        if self.elogTimestamp in ('REL', 'ABS', 'ELOG'):
+            num_ch += 1
         #print(len(data)/(1.0*num_ch), data)
         num_items = int(len(data)/num_ch)
         data = [data[i*num_ch:i*num_ch+num_ch] for i in range(num_items)]
+        if not raw_string:
+            for i, row in enumerate(data):
+                data[i] = self._convertElogArray(row)
         return data
+
+    def _convertElogArray(self,
+                          data_array: list[str]
+                          ) -> list[Union[dt.datetime, float]]:
+        """Converts a single array from fetchElog string values into float.
+        
+        If the Elog timestamp is set to 'ABS' then the first value of the array
+        is converted into datetime object.
+
+        Args:
+        data_array : list of strings
+            List containing single array of string measurements from fetchElog.
+
+        Returns:
+            List with value types converted to float (datetime for value at
+            index 0 if timestamp is ABS).
+        """
+        # When ELOG timestamp is set to ABS, the first value of a row is a
+        # datetime string and the remaining values are strings that can
+        # be converted to floating point numbers.
+        if self.elogTimestamp == "ABS":
+            new_array = []
+            dtime = data_array[0].replace('"', '')
+            # Oxygen's datetime with whole seconds does not display microseconds
+            # for those cases the ".%f" formatting is excluded.
+            fmt = '%Y-%m-%dT%H:%M:%S.%f' if '.' in dtime else '%Y-%m-%dT%H:%M:%S'
+            new_array.append(dt.datetime.strptime(dtime, fmt))
+            new_array.extend(float(value) for value in data_array[1:])
+        else:
+            new_array = [float(value) for value in data_array]
+        return new_array
+
+    def fetchElogAccumulated(self,
+                             timeout: float = 10
+                             ) -> Union[
+                                 list[list[Union[float, dt.datetime]]],
+                                 Literal[False]
+                                 ]:
+        """Fetch ELOG until the actual timestamp is reached.
+
+        This function blocks the execution and keeps fetching elog values until
+        a fetched timestamp is higher than the timestamp saved at the moment in
+        which the function was called. If called right after starting the
+        external logging, it is possible that the function needs longer because
+        the update of the Dewetron's buffer is not instantaneous.
+
+        Depending on the internet connection, the function itself can take a few
+        seconds to be excecuted.
+        
+        It requires the elog timestamp to be either 'ABS' or 'ELOG'.
+        - With 'ABS' timestamp, the stop condition will compare the absolute
+        timestamp from the system executing the function with the timestamp from
+        the operating system in which Oxygen is running.
+        - With 'ELOG' timestamp, the stop condition will be met when the fetched
+        timestamp added to the timestamp in which the startElog function was
+        called (tracked by _localElogStartTime) attribute is higher than the
+        timestamp from execution of the function.
+
+        Args:
+            timeout (float): timeout for the accumulated fetching in seconds.
+
+        Returns:
+            List of lists (matrix like) containing the accumulated fetched values
+            converted to float (datetime for values at first column if timestamp
+            is ABS.)
+        """
+
+        call_tstamp = dt.datetime.now()
+
+        def stopCondition(tstamp) -> bool:
+            """Checks if the measured timestamp has reached the call timestamp.
+            """
+            # Case for ELOG timestamp
+            if self.elogTimestamp == "ELOG":
+                tstamp = float(tstamp)
+                return self._localElogStartTime + dt.timedelta(seconds=tstamp) >= call_tstamp
+            # Case for ABS timestmap
+            tstamp = tstamp.replace('"','')
+            tstamp = dt.datetime.strptime(tstamp, '%Y-%m-%dT%H:%M:%S.%f')
+            return tstamp >= call_tstamp
+
+        # This function works only for ELOG and ABS timestamps
+        if self.elogTimestamp not in ("ELOG", "ABS"):
+            raise Exception("fetchElogAccumulated is only allowed for "
+                            "'ELOG' and 'ABS' timestamp configuration.")
+        combined_fetch = []
+        while dt.datetime.now() - call_tstamp < dt.timedelta(seconds=timeout):
+            data = self.fetchElog()
+            # Keep fetching until data is received
+            if not data:
+                sleep(0.05)
+                continue
+            combined_fetch.extend(data)
+            # Check if last fetched value reaches the call timestamp.
+            if stopCondition(combined_fetch[-1][0]):
+                for i, row in enumerate(combined_fetch):
+                    combined_fetch[i] = self._convertElogArray(row)
+                return combined_fetch
+        print("fetchElogAccumulated timed out.")
+        return False
 
     def addMarker(self, label, description=None, time=None):
         if description is None and time is None:
