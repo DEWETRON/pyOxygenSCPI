@@ -3,7 +3,7 @@ Copyright DEWETRON GmbH 2023
 
 pyOxygenSCPI - Unit Tests
 """
-import pytest
+
 from pyOxygenSCPI import OxygenSCPI
 
 def test_construction():

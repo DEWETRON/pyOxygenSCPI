@@ -21,5 +21,7 @@ jobs:
       run: pip install -r requirements.txt
     - name: Analyzing the code with pylint
       run: pylint pyOxygenSCPI
-    #- name: Running unit tests with pytest - TODO: has problems with __init__.py file
-    #  run: pytest ..
+    - name: Installing the package
+      run: python3 setup.py install
+    - name: Running unit tests with pytest
+      run: pytest
