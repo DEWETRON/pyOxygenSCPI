@@ -1,4 +1,4 @@
-name: Pylint
+name: Integration tests
 
 on:
   push:
@@ -24,7 +24,7 @@ jobs:
     - name: Install dependencies
       run: pip install -r requirements.txt
     - name: Analyzing the code with pylint
-      run: pylint pyOxygenSCPI
+      run: pylint pyOxygenSCPI examples
     - name: Installing the package
       run: python3 setup.py install
     - name: Running unit tests with pytest

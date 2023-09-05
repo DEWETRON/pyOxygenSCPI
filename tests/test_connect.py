@@ -43,6 +43,10 @@ class TestServer(threading.Thread):
         assert r == ':ELOG:TIM?\n'
         client.sendall(':ELOG:TIM ELOG\n'.encode())
 
+        r = client.recv(1024).decode()
+        assert r == ':ELOG:CALC?\n'
+        client.sendall(':ELOG:CALC AVG\n'.encode())
+
     def handle_client(self, client):
         self.handle_init_sequence(client)
         self.handle_idn(client)

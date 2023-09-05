@@ -46,6 +46,7 @@ class OxygenSCPI:
         self._value_format = self.NumberFormat.ASCII
         self.elogChannelList = []
         self.elogTimestamp = "OFF"
+        self.elogCalculations = []
         self._localElogStartTime = dt.datetime.now()
         self.DataStream = OxygenScpiDataStream(self)
         self.ChannelProperties = OxygenChannelProperties(self)
@@ -67,6 +68,7 @@ class OxygenSCPI:
                 self._getTransferChannels(False)
                 self._getElogChannels(False)
                 self._getElogTimestamp()
+                self._getElogCalculations()
                 return True
             except ConnectionRefusedError as msg:
                 template = "Connection to {!s}:{:d} refused: {!s}"
@@ -643,23 +645,64 @@ class OxygenSCPI:
             return ret
         return False
 
-    def setElogTimestamp(self, tsType='REL'):
-        if tsType in ('REL', 'ABS', 'ELOG'):
-            self._sendRaw(f':ELOG:TIM {tsType}')
-            ts_read = self._getElogTimestamp()
-            return ts_read == tsType
-        send_ok = self._sendRaw(':ELOG:TIM OFF')
+    def setElogTimestamp(self, tsType: str='REL'):
+        """
+        Sets the requested timestamp format
+
+        possible values for tsType are: 'REL', 'ABS', 'ELOG' or 'OFF'
+        """
+        if tsType not in ('REL', 'ABS', 'ELOG', 'OFF'):
+            raise ValueError("Possible ELOG timestamp types are: 'REL', 'ABS', 'ELOG' or 'OFF'")
+        self._sendRaw(f':ELOG:TIM {tsType}')
         ts_read = self._getElogTimestamp()
-        return send_ok
+        return ts_read == tsType
+    
+    def _getElogCalculations(self):
+        """Get external logging configured calculations.
+
+        Returns:
+            External logging calculations string obtained from ':ELOG:CALC?'
+        """
+        ret = self._askRaw(':ELOG:CALC?')
+        if isinstance(ret, bytes):
+            ret = ret.decode().strip()
+            self.elogCalculations = [mode.strip() for mode in ret.split(',')]
+            return self.elogCalculations
+        return None
+    
+    def setElogCalculations(self, calculations: Union[str,List[str]]='AVG'):
+        """
+        Sets a list of requested statistical calculations for all channels
+        e.g. setElogCalculations(["AVG", "RMS"])
+
+        calculations : list of strings or single string
+            possible values are 'AVG', 'MIN', 'MAX' and 'RMS'
+        """
+        if isinstance(calculations, str):
+            calculations = [calculations]
+        for mode in calculations:
+            if mode not in ['AVG', 'MIN', 'MAX', 'RMS']:
+                raise ValueError("Possible ELOG calculation types are: AVG, MIN, MAX and RMS")
+        calc_list = ", ".join(calculations)
+        self._sendRaw(f':ELOG:CALC {calc_list}')
+        return self._getElogCalculations() == calculations 
 
     def fetchElog(self,
+                  max_records: Optional[int] = None,
                   raw_string: bool = True
                   ) -> Union[
                       List[List[str]],
                       List[Union[dt.datetime, float]],
                       bool
                       ]:
-        data = self._askRaw(':ELOG:FETCH?')
+        """
+        Fetches max_records records or less from the internal ELOG buffer. If no parameter is given,
+        all available records are returned. fetchElog() is only possible after startElog().
+        """
+        if max_records:
+            data = self._askRaw(f':ELOG:FETCH? {max_records:d}')
+        else:
+            data = self._askRaw(':ELOG:FETCH?')
         if not isinstance(data, bytes):
             return False
 
@@ -671,11 +714,11 @@ class OxygenSCPI:
             data = data.split(' ')[1]
         data = data.split(',')
         num_ch = len(self.elogChannelList)
+        num_values = num_ch * len(self.elogCalculations)
         if self.elogTimestamp in ('REL', 'ABS', 'ELOG'):
-            num_ch += 1
-        #print(len(data)/(1.0*num_ch), data)
-        num_items = int(len(data)/num_ch)
-        data = [data[i*num_ch:i*num_ch+num_ch] for i in range(num_items)]
+            num_values += 1
+        num_items = int(len(data)/num_values)
+        data = [data[i*num_values:i*num_values+num_values] for i in range(num_items)]
         if not raw_string:
             for i, row in enumerate(data):
                 data[i] = self._convertElogArray(row)
