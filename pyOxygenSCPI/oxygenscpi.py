@@ -41,7 +41,7 @@ class OxygenSCPI:
         #self.connect()
         self._headersActive = True
         self.channelList = []
-        self._scpi_version = (1,5)
+        self._scpi_version = None
         self._value_dimension = None
         self._value_format = self.NumberFormat.ASCII
         self.elogChannelList = []
@@ -63,7 +63,7 @@ class OxygenSCPI:
                 sock.connect((self._ip_addr, self._tcp_port))
                 self._sock = sock
                 self.headersOff()
-                self.getVersion()
+                self._scpi_version = self._read_version()
                 self._getTransferChannels(False)
                 self._getElogChannels(False)
                 self._getElogTimestamp()
@@ -129,23 +129,33 @@ class OxygenSCPI:
                 log.error(template.format(msg))
         return False
 
-    def getIdn(self) -> Union[str, bool]:
+    def getIdn(self) -> Optional[str]:
+        """
+        The query returns a colon-separated four-field ASCII string.
+        The first field contains the manufacturer name, the second field is the product name,
+        the third field is the device serial number, and the fourth field is the product revision number
+        """
         ret = self._askRaw('*IDN?')
         if isinstance(ret, bytes):
             return ret.decode().strip()
-        return False
+        return None
 
-    def getVersion(self) -> Optional[Tuple[int, int]]:
+    def _read_version(self):
         """
         SCPI,"1999.0",RC_SCPI,"1.6",OXYGEN,"2.5.71"
         """
         ret = self._askRaw('*VER?')
         if isinstance(ret, bytes):
             ret = ret.decode().strip().split(',')
-            self._scpi_version = ret[3].replace('"','').split('.')
-            self._scpi_version = (int(self._scpi_version[0]), int(self._scpi_version[1]))
-            return self._scpi_version
+            scpi_version = ret[3].replace('"','').split('.')
+            return (int(scpi_version[0]), int(scpi_version[1]))
         return None
+
+    def getVersion(self) -> Optional[Tuple[int, int]]:
+        """
+        Returns the current SCPI version of the server
+        """
+        return self._scpi_version
 
     def reset(self) -> None:
         """
@@ -837,7 +847,7 @@ class OxygenScpiDataStream:
     def setItems(self, channelNames: List[str], streamGroup=1):
         """ Set Datastream Items to be transfered
         """
-        if not is_minimum_version(self.oxygen._scpi_version, (1,7)):
+        if not is_minimum_version(self.oxygen.getVersion(), (1,7)):
             log.warning('SCPI Version 1.7 or higher required')
             return False
         channelListStr = '"'+'","'.join(channelNames)+'"'

@@ -45,7 +45,6 @@ class TestServer(threading.Thread):
 
     def handle_client(self, client):
         self.handle_init_sequence(client)
-        self.handle_ver(client)
         self.handle_idn(client)
 
     def run(self):
