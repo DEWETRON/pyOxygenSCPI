@@ -32,5 +32,5 @@ setuptools.setup(
     packages=["pyOxygenSCPI"],
     package_dir={"pyOxygenSCPI": "pyOxygenSCPI"},
     install_requires=[],
-    python_requires=">=3.6",
+    python_requires=">=3.7",
 )
