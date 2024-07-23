@@ -958,6 +958,15 @@ class OxygenScpiDataStream:
         else:
             self.oxygen._sendRaw(f':DST:TRIG{streamGroup:d} OFF')
 
+    def setInterval(self, value:int, streamGroup=1):
+        self.oxygen._sendRaw(f':DST:INTERVAL{streamGroup:d} {value:d}')
+
+    def setLiveReplay(self, enabled:bool, streamGroup=1):
+        if enabled:
+            self.oxygen._sendRaw(f':DST:REPLAY{streamGroup:d} LIVE')
+        else:
+            self.oxygen._sendRaw(f':DST:REPLAY{streamGroup:d} BULK')
+
     def reset(self):
         self.oxygen._sendRaw(':DST:RESET')
 
