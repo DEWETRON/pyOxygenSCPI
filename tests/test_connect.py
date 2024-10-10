@@ -1,7 +1,6 @@
 import socket
 import threading
 import time
-import pytest
 from pyOxygenSCPI import OxygenSCPI
 
 TCP_PORT = 10001
@@ -21,7 +20,7 @@ class TestServer(threading.Thread):
         r = client.recv(1024).decode()
         assert r == '*IDN?\n'
         client.sendall('DEWETRON,PYTEST,0,1.0.0\n'.encode())
-    
+
     def handle_init_sequence(self, client):
         r = client.recv(1024).decode()
         assert r == ':COMM:HEAD OFF\n'

@@ -656,7 +656,7 @@ class OxygenSCPI:
         self._sendRaw(f':ELOG:TIM {tsType}')
         ts_read = self._getElogTimestamp()
         return ts_read == tsType
-    
+
     def _getElogCalculations(self):
         """Get external logging configured calculations.
 
@@ -669,7 +669,7 @@ class OxygenSCPI:
             self.elogCalculations = [mode.strip() for mode in ret.split(',')]
             return self.elogCalculations
         return None
-    
+
     def setElogCalculations(self, calculations: Union[str,List[str]]='AVG'):
         """
         Sets a list of requested statistical calculations for all channels
@@ -685,7 +685,7 @@ class OxygenSCPI:
                 raise ValueError("Possible ELOG calculation types are: AVG, MIN, MAX and RMS")
         calc_list = ", ".join(calculations)
         self._sendRaw(f':ELOG:CALC {calc_list}')
-        return self._getElogCalculations() == calculations 
+        return self._getElogCalculations() == calculations
 
     def fetchElog(self,
                   max_records: Optional[int] = None,
@@ -728,7 +728,7 @@ class OxygenSCPI:
                           data_array: List[str]
                           ) -> List[Union[dt.datetime, float]]:
         """Converts a single array from fetchElog string values into float.
-        
+
         If the Elog timestamp is set to 'ABS' then the first value of the array
         is converted into datetime object.
 
@@ -771,7 +771,7 @@ class OxygenSCPI:
 
         Depending on the internet connection, the function itself can take a few
         seconds to be excecuted.
-        
+
         It requires the elog timestamp to be either 'ABS' or 'ELOG'.
         - With 'ABS' timestamp, the stop condition will compare the absolute
         timestamp from the system executing the function with the timestamp from
