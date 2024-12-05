@@ -1052,7 +1052,7 @@ class OxygenChannelProperties:
 
     def getTrionInputMode(self, ch_id):
         try:
-            return self.oxygen.getChannelPropValue(ch_id, 'Mode')
+            return self.oxygen.getChannelPropValue(ch_id, 'Mode').split(',')[1].strip(')"')
         except:
             return ""
 
