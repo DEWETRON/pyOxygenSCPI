@@ -860,10 +860,13 @@ class OxygenSCPI:
 
         return None
 
-    def getChannelPropValue(self, channel_id:Union[str, int], prop:str):
+    def getChannelPropValue(self, channel_id:Union[str, int], property_name:str):
+        """
+        Queries a specific property (config-item) of an OXYGEN channel
+        """
         if isinstance(channel_id, int):
             channel_id = str(channel_id)
-        ret = self._askRaw(f':CHANNEL:PROP? "{channel_id:s}","{prop:s}"')
+        ret = self._askRaw(f':CHANNEL:PROP? "{channel_id:s}","{property_name:s}"')
         if ret:
             return ret.decode().strip()
         return None
@@ -876,10 +879,24 @@ class OxygenSCPI:
             return ret.decode().strip().replace('"','').split(",")
         return None
 
-    def setChannelPropValue(self, channel_id:Union[str, int], prop:str, val:str):
+    def setChannelPropValue(self, channel_id:Union[str, int], property_name:str, val:str):
+        """
+        Set the value[s] of a specific property (config-item) of a given channel
+        """
         if isinstance(channel_id, int):
             channel_id = str(channel_id)
-        self._sendRaw(f':CHANNEL:PROP "{channel_id:s}","{prop:s}","{val:s}"')
+        self._sendRaw(f':CHANNEL:PROP "{channel_id:s}","{property_name:s}","{val:s}"')
+
+    def getChannelPropConstraint(self, channel_id:Union[str, int], property_name:str):
+        """
+        Queries the constraints of a specific property (config-item) of a given channel
+        """
+        if isinstance(channel_id, int):
+            channel_id = str(channel_id)
+        ret = self._askRaw(f':CHANNEL:CONSTR? "{channel_id:s}","{property_name:s}"')
+        if ret:
+            return ret.decode().strip()
+        return None
 
 # TODO: Better add and remove data stream instances
 class OxygenScpiDataStream:
