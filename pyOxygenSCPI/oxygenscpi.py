@@ -839,8 +839,8 @@ class OxygenSCPI:
     
     def setMeasurementHeader(self,
                              header_key: str,
-                             header_value: str | float | int,
-                             header_type: str | None = None):
+                             header_value: Union[str, float, int],
+                             header_type: Union[str, None] = None):
         if header_type in ["text", None]:
             if isinstance(header_value, (float, int)):
                 header_value = str(header_value)
