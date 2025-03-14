@@ -836,6 +836,19 @@ class OxygenSCPI:
         if time is None:
             return self._sendRaw(f':MARK:ADD "{label:s}","{description:s}"')
         return self._sendRaw(f':MARK:ADD "{label:s}","{description:s}",{time:f}')
+    
+    def setMeasurementHeader(self,
+                             header_key: str,
+                             header_value: str | float | int,
+                             header_type: str | None = None):
+        if header_type in ["text", None]:
+            if isinstance(header_value, (float, int)):
+                header_value = str(header_value)
+            self._sendRaw(f'HEAD:SET "{header_key:s}","{header_value:s}"')
+        elif header_type == "numeric":
+            if not isinstance(header_value, (float, int)):
+                raise TypeError("NUMERIC_CONSTANT needs a numeric value")
+            self._sendRaw(f'HEAD:SET NUMERIC_CONSTANT,"{header_key:s}",{header_value}')
 
     def getChannelList(self):
         ret = self._askRaw(':CHANNEL:NAMES?')
