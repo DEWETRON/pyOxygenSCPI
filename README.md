@@ -5,6 +5,8 @@ pyOxygenSCPI is a Python wrapper for SCPI communication with Dewetron Oxygen
 
 # Installation
 
+## Manual
+
 1. Clone GIT repository \
 `git clone https://github.com/DEWETRON/pyOxygenSCPI.git`
 
@@ -13,6 +15,30 @@ pyOxygenSCPI is a Python wrapper for SCPI communication with Dewetron Oxygen
 
 3. Install \
 `python3 setup.py install`
+
+## Using pip
+```bash
+python3 -m pip install git+https://github.com/DEWETRON/pyOxygenSCPI.git
+```
+
+# Documentation
+## Quick Start
+This quick demo shows how to connect to an Oxygen instance on the local system and displays its channel list:
+```python
+from pyOxygenSCPI import OxygenSCPI
+
+mDevice = OxygenSCPI(ip_addr='localhost', tcp_port=10001)
+channel_list = mDevice.getChannelList()
+
+print("Available channels:")
+for ch_id, ch_name in channel_list:
+    print(f"  {ch_name:20} (id = {ch_id})")
+```
+
+You can find more examples in the [examples](examples) folder.
+
+## OXYGEN SCPI Command Reference
+You can find the SCPI command reference here: https://docs.dewetron.cloud/doc/scpi/
 
 # About
 
