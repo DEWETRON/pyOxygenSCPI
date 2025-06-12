@@ -952,7 +952,7 @@ class OxygenScpiDataStream:
             return ret
         return False
 
-    def setTriggered(self, streamGroup=1, value=True):
+    def setTriggered(self, value=True, streamGroup: int = 1):
         if value:
             self.oxygen._sendRaw(f':DST:TRIG{streamGroup:d} ON')
         else:
@@ -966,6 +966,10 @@ class OxygenScpiDataStream:
             self.oxygen._sendRaw(f':DST:REPLAY{streamGroup:d} LIVE')
         else:
             self.oxygen._sendRaw(f':DST:REPLAY{streamGroup:d} BULK')
+
+    def setStartTime(self, value:str, streamGroup=1):
+        timeStr = '"' + value + '"'
+        self.oxygen._sendRaw(f':DST:START_TIME{streamGroup:d} {timeStr:s}')
 
     def reset(self):
         self.oxygen._sendRaw(':DST:RESET')
