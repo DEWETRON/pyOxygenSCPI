@@ -988,8 +988,24 @@ class OxygenScpiDataStream:
         else:
             self.oxygen._sendRaw(f':DST:TRIG{streamGroup:d} OFF')
 
+    def getTriggered(self, streamGroup: int = 1):
+        ret = self.oxygen._askRaw(f':DST:TRIG{streamGroup:d}?')
+        if isinstance(ret, bytes):
+            ret = ret.decode().strip()
+            ret = ret.replace(':DST:TRIG ','')
+            return ret
+        return False
+
     def setInterval(self, value:int, streamGroup=1):
         self.oxygen._sendRaw(f':DST:INTERVAL{streamGroup:d} {value:d}')
+
+    def getInterval(self, streamGroup: int = 1):
+        ret = self.oxygen._askRaw(f':DST:INTERVAL{streamGroup:d}?')
+        if isinstance(ret, bytes):
+            ret = ret.decode().strip()
+            ret = ret.replace(':DST:INTERVAL ','')
+            return ret
+        return False
 
     def setLiveReplay(self, enabled:bool, streamGroup=1):
         if enabled:
@@ -997,9 +1013,25 @@ class OxygenScpiDataStream:
         else:
             self.oxygen._sendRaw(f':DST:REPLAY{streamGroup:d} BULK')
 
+    def getLiveReplay(self, streamGroup=1):
+        ret = self.oxygen._askRaw(f':DST:REPLAY{streamGroup:d}?')
+        if isinstance(ret, bytes):
+            ret = ret.decode().strip()
+            ret = ret.replace(':DST:REPLAY ','')
+            return ret
+        return False
+
     def setStartTime(self, value:str, streamGroup=1):
         timeStr = '"' + value + '"'
         self.oxygen._sendRaw(f':DST:START_TIME{streamGroup:d} {timeStr:s}')
+
+    def getStartTime(self, streamGroup=1):
+        ret = self.oxygen._askRaw(f':DST:START_TIME{streamGroup:d}?')
+        if isinstance(ret, bytes):
+            ret = ret.decode().strip()
+            ret = ret.replace(':DST:START_TIME ','')
+            return ret
+        return False
 
     def reset(self):
         self.oxygen._sendRaw(':DST:RESET')
