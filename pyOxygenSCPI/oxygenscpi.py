@@ -1021,15 +1021,15 @@ class OxygenScpiDataStream:
             return ret
         return False
 
-    def setStartTime(self, value:str, streamGroup=1):
+    def setStartTime(self, value:str):
         timeStr = '"' + value + '"'
-        self.oxygen._sendRaw(f':DST:START_TIME{streamGroup:d} {timeStr:s}')
+        self.oxygen._sendRaw(f':DST:STARTTIME {timeStr:s}')
 
-    def getStartTime(self, streamGroup=1):
-        ret = self.oxygen._askRaw(f':DST:START_TIME{streamGroup:d}?')
+    def getStartTime(self):
+        ret = self.oxygen._askRaw(f':DST:STARTTIME?')
         if isinstance(ret, bytes):
             ret = ret.decode().strip()
-            ret = ret.replace(':DST:START_TIME ','')
+            ret = ret.replace(':DST:STARTTIME ','')
             return ret
         return False
 
