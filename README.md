@@ -44,9 +44,9 @@ You can find the SCPI command reference here: https://docs.dewetron.cloud/doc/sc
 
 **For technical questions please contact:**
 
-Michael Oberhofer 
+Matthias Straka
 
-michael.oberhofer@dewetron.com
+matthias.straka@dewetron.com
 
 Gunther Laure
 
